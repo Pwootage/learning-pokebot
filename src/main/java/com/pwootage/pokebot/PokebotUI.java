@@ -22,10 +22,10 @@ import static org.lwjgl.opengl.GL11.glColor4f;
 import static org.lwjgl.opengl.GL11.glEnd;
 import static org.lwjgl.opengl.GL11.glLoadIdentity;
 import static org.lwjgl.opengl.GL11.glMatrixMode;
-import static org.lwjgl.opengl.GL11.glTexCoord2f;
-import static org.lwjgl.opengl.GL11.glVertex2f;
 
 import java.awt.Canvas;
+import java.util.ArrayList;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.JFrame;
@@ -38,8 +38,11 @@ import org.lwjgl.util.glu.GLU;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.pwootage.lwjgl.utils.geometry.GeoLib;
+import com.pwootage.lwjgl.utils.math.Vector2;
 import com.pwootage.lwjgl.utils.textures.Texture;
 import com.pwootage.pokebot.video.GameFrame;
+import com.pwootage.pokebot.video.GameTile;
 
 /**
  * @author Pwootage
@@ -51,13 +54,16 @@ public class PokebotUI extends JFrame {
 	private Canvas				canvas;
 	private boolean				running;
 	private GameFrame			gf;
+	private ArrayList<GameTile>	uniqueTiles	= new ArrayList<>();
 	private AtomicBoolean		newFrame	= new AtomicBoolean(false);
 	private Texture				frameTex;
+	private Texture				tilesTex;
 	
 	public PokebotUI() {
 		setSize(160 * 2, 144 * 2);
 		canvas = new Canvas();
 		add(canvas, "Center");
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 	}
 	
 	public void init() throws LWJGLException {
@@ -105,28 +111,33 @@ public class PokebotUI extends JFrame {
 		if (frameTex != null) {
 			drawFrame();
 		}
+		if (tilesTex != null) {
+			drawTilesTex();
+		}
 	}
 	
 	private void drawFrame() {
 		frameTex.glBindTexture();
-		GL11.glPushMatrix();
+		Vector2 blPos = new Vector2(0f, 0.0f);
+		Vector2 blTex = new Vector2(0, 1);
+		Vector2 trPos = new Vector2(0.5f, 1.0f);
+		Vector2 trTex = new Vector2(1, 0);
 		glBegin(GL_QUADS);
 		glColor4f(1, 1, 1, 1);
-		
-		glTexCoord2f(0, 0);
-		glVertex2f(0, 1);
-		
-		glTexCoord2f(1, 0);
-		glVertex2f(1, 1);
-		
-		glTexCoord2f(1, 1);
-		glVertex2f(1, 0);
-		
-		glTexCoord2f(0, 1);
-		glVertex2f(0, 0);
-		
+		GeoLib.drawQuad(blPos, trPos, blTex, trTex);
 		glEnd();
-		GL11.glPopMatrix();
+	}
+	
+	private void drawTilesTex() {
+		tilesTex.glBindTexture();
+		Vector2 blPos = new Vector2(0.5f, 0.0f);
+		Vector2 blTex = new Vector2(0, 1);
+		Vector2 trPos = new Vector2(1f, 1f);
+		Vector2 trTex = new Vector2(1, 0);
+		glBegin(GL_QUADS);
+		glColor4f(1, 1, 1, 1);
+		GeoLib.drawQuad(blPos, trPos, blTex, trTex);
+		glEnd();
 	}
 	
 	private void updateTextureIfRequired() {
@@ -134,9 +145,33 @@ public class PokebotUI extends JFrame {
 			if (frameTex == null) {
 				frameTex = new Texture(gf.getPixelArray(), GameFrame.WIDTH, GameFrame.HEIGHT);
 			} else {
-				frameTex.update(gf.getPixelArray());
+				frameTex.update(gf.getPixelArray(), 0, 0, GameFrame.WIDTH, GameFrame.HEIGHT);
+			}
+			int w = 256;
+			int h = 256;
+			int tilesW = w / GameTile.WIDTH;
+			int tilesH = h / GameTile.HEIGHT;
+			int totalTiles = tilesW * tilesH;
+			if (tilesTex == null) {
+				tilesTex = new Texture(new int[w * h], w, h);
+			}
+			int ind = 0;
+			for (GameTile t : uniqueTiles) {
+				if (ind >= totalTiles) {
+					break;
+				}
+				int updTileX = ind % tilesW;
+				int updTileY = ind / tilesH;
+				int updX = updTileX * GameTile.WIDTH;
+				int updY = updTileY * GameTile.HEIGHT;
+				tilesTex.update(t.getPixels(), updX, updY, GameTile.WIDTH, GameTile.HEIGHT);
+				ind++;
 			}
 			newFrame.set(false);
 		}
+	}
+	
+	public void updateUniqueTiles(Set<GameTile> uniqueTiles) {
+		this.uniqueTiles = new ArrayList<>(uniqueTiles);
 	}
 }
